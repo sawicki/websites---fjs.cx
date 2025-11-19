@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gemini C-PASTE Prompt Architect (Local)</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/lucide.min.js"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #0f172a;
+        color: #e2e8f0;
+      }
+      .mono {
+        font-family: "JetBrains Mono", monospace;
+      }
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1e293b;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #475569;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #64748b;
+      }
+
+      .fade-enter-active,
+      .fade-leave-active {
+        transition: opacity 0.2s ease;
+      }
+      .fade-enter-from,
+      .fade-leave-to {
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app" class="h-screen flex flex-col overflow-hidden">
+      <!-- Header -->
+      <header
+        class="bg-slate-900 border-b border-slate-700 p-4 flex justify-between items-center z-10"
+      >
+        <div class="flex items-center gap-3">
+          <i data-lucide="sparkles" class="text-cyan-400"></i>
+          <h1 class="font-bold text-xl tracking-tight text-white">
+            C-PASTE
+            <span class="text-slate-400 font-normal text-sm ml-2"
+              >Prompt Architect</span
+            >
+          </h1>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <!-- Domain Toggle -->
+          <div class="bg-slate-800 rounded-lg p-1 flex text-xs font-medium">
+            <button
+              @click="domain = 'general'"
+              :class="domain === 'general' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-slate-200'"
+              class="px-3 py-1 rounded-md transition-all"
+            >
+              General
+            </button>
+            <button
+              @click="domain = 'coding'"
+              :class="domain === 'coding' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-slate-200'"
+              class="px-3 py-1 rounded-md transition-all"
+            >
+              Coding
+            </button>
+            <button
+              @click="domain = 'writing'"
+              :class="domain === 'writing' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-slate-200'"
+              class="px-3 py-1 rounded-md transition-all"
+            >
+              Writing
+            </button>
+          </div>
+
+          <!-- Local Storage Indicator -->
+          <div
+            class="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-900/20 px-3 py-1 rounded-full border border-emerald-800/50"
+          >
+            <i data-lucide="hard-drive" class="w-3 h-3"></i>
+            <span class="hidden sm:inline">Local Storage</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="flex-1 flex overflow-hidden relative">
+        <!-- LEFT: Configuration Builder -->
+        <div
+          class="w-full lg:w-1/2 flex flex-col border-r border-slate-700 overflow-y-auto bg-slate-900"
+        >
+          <!-- Toolbar -->
+          <div
+            class="p-4 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900/95 backdrop-blur z-10"
+          >
+            <h2
+              class="text-sm font-semibold text-slate-300 uppercase tracking-wider"
+            >
+              Prompt Builder
+            </h2>
+            <div class="flex gap-2">
+              <button
+                @click="resetForm"
+                class="text-xs px-3 py-1.5 rounded border border-slate-600 hover:bg-slate-800 text-slate-300 transition"
+              >
+                Reset
+              </button>
+              <button
+                @click="loadPresets"
+                class="text-xs px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-white transition flex gap-1 items-center"
+              >
+                <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Load Last
+              </button>
+            </div>
+          </div>
+
+          <!-- C-PASTE Sections -->
+          <div class="p-4 space-y-6 pb-20">
+            <!-- New: Bio / User Persona -->
+            <section-card
+              title="My Bio / User Context"
+              color="text-indigo-400"
+              icon="user-check"
+              description="Who are you? (Optional background)"
+            >
+              <smart-textarea
+                v-model="form.bio"
+                placeholder="e.g., I'm the Treasurer for the HOA Placido Bayou Community Association..."
+                :suggestions="suggestions.bio"
+                @add-history="addToHistory('bio', $event)"
+              ></smart-textarea>
+            </section-card>
+
+            <!-- C: Context (AI Persona) -->
+            <section-card
+              title="Context (AI Persona)"
+              color="text-blue-400"
+              icon="bot"
+              description="Who is the AI? What is the background?"
+            >
+              <smart-textarea
+                v-model="form.context"
+                placeholder="e.g., Act as a Senior Python Engineer..."
+                :suggestions="suggestions.context"
+                @add-history="addToHistory('context', $event)"
+              ></smart-textarea>
+            </section-card>
+
+            <!-- P: Purpose -->
+            <section-card
+              title="Purpose"
+              color="text-purple-400"
+              icon="target"
+              description="What is the high-level goal?"
+            >
+              <smart-textarea
+                v-model="form.purpose"
+                placeholder="e.g., Create a robust authentication system..."
+                :suggestions="suggestions.purpose"
+                @add-history="addToHistory('purpose', $event)"
+              ></smart-textarea>
+            </section-card>
+
+            <!-- A: Audience -->
+            <section-card
+              title="Audience"
+              color="text-orange-400"
+              icon="users"
+              description="Who is this for?"
+            >
+              <smart-textarea
+                v-model="form.audience"
+                placeholder="e.g., A complete beginner to programming..."
+                :suggestions="suggestions.audience"
+                @add-history="addToHistory('audience', $event)"
+              ></smart-textarea>
+            </section-card>
+
+            <!-- S: Style -->
+            <section-card
+              title="Style & Format"
+              color="text-pink-400"
+              icon="palette"
+              description="Tone, constraints, and output format"
+            >
+              <smart-textarea
+                v-model="form.style"
+                placeholder="e.g., JSON output only, no markdown, PEP-8..."
+                :suggestions="suggestions.style"
+                @add-history="addToHistory('style', $event)"
+              ></smart-textarea>
+            </section-card>
+
+            <!-- T: Task -->
+            <section-card
+              title="Task"
+              color="text-green-400"
+              icon="check-square"
+              description="Specific, step-by-step instructions"
+            >
+              <smart-textarea
+                v-model="form.task"
+                placeholder="e.g., Write a function that takes {{input_data}} and..."
+                :rows="4"
+                :suggestions="suggestions.task"
+                @add-history="addToHistory('task', $event)"
+              ></smart-textarea>
+              <div
+                v-if="detectedVariables.length > 0"
+                class="mt-3 bg-slate-800/50 p-3 rounded border border-slate-700"
+              >
+                <div class="text-xs text-slate-400 mb-2 font-mono">
+                  Detected Variables
+                </div>
+                <div
+                  v-for="variable in detectedVariables"
+                  :key="variable"
+                  class="mb-2 last:mb-0"
+                >
+                  <label class="text-xs text-green-400 block mb-1"
+                    >{{ variable }}</label
+                  >
+                  <textarea
+                    v-model="variableValues[variable]"
+                    class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-200 focus:border-green-500 focus:outline-none"
+                    rows="2"
+                  ></textarea>
+                </div>
+              </div>
+            </section-card>
+
+            <!-- E: Examples -->
+            <section-card
+              title="Examples"
+              color="text-yellow-400"
+              icon="list"
+              description="Few-shot examples (Input -> Output)"
+            >
+              <div class="space-y-3">
+                <div
+                  v-for="(ex, idx) in form.examples"
+                  :key="idx"
+                  class="bg-slate-800 p-3 rounded border border-slate-700 relative group"
+                >
+                  <button
+                    @click="removeExample(idx)"
+                    class="absolute top-2 right-2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition"
+                  >
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
+                  <input
+                    v-model="ex.input"
+                    placeholder="User Input..."
+                    class="w-full bg-transparent border-b border-slate-700 pb-1 mb-2 text-sm focus:outline-none focus:border-yellow-500"
+                  />
+                  <textarea
+                    v-model="ex.output"
+                    placeholder="Ideal AI Response..."
+                    class="w-full bg-transparent text-sm text-slate-300 focus:outline-none resize-none h-16"
+                  ></textarea>
+                </div>
+                <button
+                  @click="addExample"
+                  class="text-xs flex items-center gap-1 text-slate-400 hover:text-yellow-400 transition"
+                >
+                  <i data-lucide="plus-circle" class="w-4 h-4"></i> Add Example
+                </button>
+              </div>
+            </section-card>
+          </div>
+        </div>
+
+        <!-- RIGHT: Preview & Output -->
+        <div
+          class="hidden lg:flex w-1/2 flex-col bg-slate-950 border-l border-slate-800 relative"
+        >
+          <!-- Toolbar -->
+          <div
+            class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950"
+          >
+            <h2
+              class="text-sm font-semibold text-slate-300 uppercase tracking-wider"
+            >
+              Compiled Prompt
+            </h2>
+            <div class="flex gap-2">
+              <button
+                @click="copyToClipboard"
+                class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-1.5 rounded text-sm font-medium transition flex items-center gap-2 shadow-lg shadow-cyan-900/20"
+              >
+                <span v-if="copied">Copied!</span>
+                <span v-else class="flex items-center gap-2"
+                  ><i data-lucide="copy" class="w-4 h-4"></i> Copy Prompt</span
+                >
+              </button>
+            </div>
+          </div>
+
+          <!-- Preview Area -->
+          <div
+            class="flex-1 overflow-y-auto p-6 font-mono text-sm leading-relaxed"
+          >
+            <div
+              v-if="isEmpty"
+              class="h-full flex flex-col items-center justify-center text-slate-600"
+            >
+              <i data-lucide="terminal" class="w-12 h-12 mb-4 opacity-50"></i>
+              <p>Start typing to build your prompt.</p>
+            </div>
+            <div
+              v-else
+              class="whitespace-pre-wrap text-slate-300 selection:bg-cyan-900 selection:text-white"
+              v-html="highlightedPreview"
+            ></div>
+          </div>
+
+          <!-- Usage Tip -->
+          <div
+            class="p-3 bg-slate-900 border-t border-slate-800 text-xs text-slate-500 flex justify-between items-center"
+          >
+            <span>Saved locally to browser</span>
+            <span class="font-mono text-slate-600"
+              >{{ compiledPrompt.length }} chars</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile Preview Modal (Hidden on Desktop) -->
+      <div
+        v-if="showMobilePreview"
+        class="fixed inset-0 z-50 lg:hidden bg-slate-950 flex flex-col"
+      >
+        <div
+          class="p-4 border-b border-slate-800 flex justify-between items-center"
+        >
+          <h2 class="text-sm font-semibold text-slate-300">Preview</h2>
+          <button
+            @click="showMobilePreview = false"
+            class="text-slate-400 hover:text-white"
+          >
+            Close
+          </button>
+        </div>
+        <div
+          class="flex-1 p-4 overflow-y-auto font-mono text-xs text-slate-300 whitespace-pre-wrap"
+        >
+          {{ compiledPrompt }}
+        </div>
+        <div class="p-4 border-t border-slate-800">
+          <button
+            @click="copyToClipboard"
+            class="w-full bg-cyan-600 py-3 rounded text-white font-bold"
+          >
+            Copy to Clipboard
+          </button>
+        </div>
+      </div>
+
+      <!-- Floating Action Button for Mobile -->
+      <button
+        @click="showMobilePreview = true"
+        class="lg:hidden fixed bottom-6 right-6 bg-cyan-600 text-white p-4 rounded-full shadow-xl shadow-cyan-900/40 z-40"
+      >
+        <i data-lucide="eye" class="w-6 h-6"></i>
+      </button>
+    </div>
+
+    <script type="module">
+      const { createApp, ref, computed, watch, onMounted, nextTick } = Vue;
+
+      // --- COMPONENT: Section Card ---
+      const SectionCard = {
+        props: ["title", "color", "icon", "description"],
+        template: `
+    <div class="bg-slate-800/40 rounded-lg border border-slate-700 overflow-hidden transition-all hover:border-slate-600">
+        <div class="p-3 bg-slate-800/60 border-b border-slate-700/50 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <i :data-lucide="icon" :class="['w-4 h-4', color]"></i>
+                <span class="font-semibold text-slate-200 text-sm">{{ title }}</span>
+            </div>
+            <span class="text-[10px] text-slate-500 uppercase tracking-wider hidden sm:inline">{{ description }}</span>
+        </div>
+        <div class="p-3">
+            <slot></slot>
+        </div>
+    </div>
+    `,
+      };
+
+      // --- COMPONENT: Smart Textarea with Dropdown ---
+      const SmartTextarea = {
+        props: ["modelValue", "placeholder", "rows", "suggestions"],
+        emits: ["update:modelValue", "add-history"],
+        setup(props, { emit }) {
+          const focused = ref(false);
+
+          const updateValue = (e) => {
+            emit("update:modelValue", e.target.value);
+          };
+
+          const selectSuggestion = (text) => {
+            const current = props.modelValue || "";
+            const separator =
+              current.length > 0 ? (current.endsWith(" ") ? "" : " ") : "";
+            emit("update:modelValue", current + separator + text);
+          };
+
+          // Handle Blur safely
+          const handleBlur = () => {
+            setTimeout(() => {
+              focused.value = false;
+            }, 200);
+          };
+
+          return { focused, updateValue, selectSuggestion, handleBlur };
+        },
+        template: `
+    <div class="relative group">
+        <textarea 
+            :value="modelValue"
+            @input="updateValue"
+            @focus="focused = true"
+            @blur="handleBlur" 
+            :placeholder="placeholder"
+            :rows="rows || 2"
+            class="w-full bg-slate-900 border border-slate-700 rounded p-2.5 text-sm text-slate-200 placeholder-slate-600 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 focus:outline-none transition-all resize-y"
+        ></textarea>
+        
+        <!-- Suggestions Dropdown (Visible on Focus) -->
+        <div v-if="focused && suggestions && suggestions.length > 0" class="absolute z-20 top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded shadow-xl max-h-40 overflow-y-auto">
+             <div class="text-[10px] text-slate-500 p-2 border-b border-slate-700 bg-slate-800 sticky top-0">Suggestions / History</div>
+             <button 
+                v-for="s in suggestions" 
+                @click="selectSuggestion(s)"
+                class="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-cyan-900/30 hover:text-cyan-300 truncate transition-colors"
+            >
+                {{ s }}
+            </button>
+        </div>
+    </div>
+    `,
+      };
+
+      // --- MAIN APP ---
+      createApp({
+        components: {
+          "section-card": SectionCard,
+          "smart-textarea": SmartTextarea,
+        },
+        setup() {
+          const domain = ref("coding"); // 'general', 'coding', 'writing'
+          const copied = ref(false);
+          const showMobilePreview = ref(false);
+          const LOCAL_STORAGE_KEY = "cpaste_draft_v1";
+
+          // Form State
+          const form = ref({
+            bio: "",
+            context: "",
+            purpose: "",
+            audience: "",
+            style: "",
+            task: "",
+            examples: [],
+          });
+
+          // Variable Values
+          const variableValues = ref({});
+
+          // Default Suggestions
+          const defaultSuggestions = {
+            coding: {
+              bio: [
+                "I am a Senior Developer working on a legacy codebase",
+                "I am a CS Student learning algorithms",
+              ],
+              context: [
+                "Act as a Senior Python Engineer",
+                "Act as a DevOps Specialist",
+                "Act as a React Expert",
+              ],
+              style: [
+                "PEP-8 Compliant",
+                "Production ready code with error handling",
+                "Include comments explaining logic",
+                "Do not use external libraries",
+              ],
+              audience: ["Junior Developer", "CTO", "Data Scientist"],
+              purpose: [
+                "Refactor legacy code",
+                "Write unit tests",
+                "Optimize performance",
+              ],
+            },
+            writing: {
+              bio: [
+                "I am the Treasurer for the HOA Placido Bayou Community Association",
+                "I am a small business owner in St. Petersburg",
+              ],
+              context: [
+                "Act as a Professional Copywriter",
+                "Act as a Technical Writer",
+                "Act as a Creative Novelist",
+              ],
+              style: [
+                "Concise and direct",
+                "Persuasive and emotional",
+                "Use bullet points for readability",
+                "Avoid jargon",
+              ],
+              audience: [
+                "General Public",
+                "Executive Leadership",
+                "Potential Customers",
+              ],
+              purpose: [
+                "Summarize this text",
+                "Write a blog post",
+                "Draft an email",
+              ],
+            },
+            general: {
+              bio: [
+                "I am a busy parent organizing a schedule",
+                "I am a student researching a topic",
+              ],
+              context: [
+                "Act as a helpful assistant",
+                "Act as a project manager",
+              ],
+              style: ["Casual", "Professional", "Detailed"],
+              audience: ["Myself", "Family", "Colleagues"],
+              purpose: ["Plan a trip", "Explain a concept", "Draft a message"],
+            },
+          };
+
+          const suggestions = computed(() => {
+            const domainData =
+              defaultSuggestions[domain.value] || defaultSuggestions["general"];
+            return {
+              bio: domainData.bio || [],
+              context: domainData.context || [],
+              purpose: domainData.purpose || [],
+              audience: domainData.audience || [],
+              style: domainData.style || [],
+              task: domainData.task || [],
+            };
+          });
+
+          // Detect {{variables}} in task
+          const detectedVariables = computed(() => {
+            const regex = /\{\{([^}]+)\}\}/g;
+            const matches = [...form.value.task.matchAll(regex)];
+            return [...new Set(matches.map((m) => m[1]))];
+          });
+
+          // Clean up variableValues when task changes
+          watch(detectedVariables, (newVars) => {
+            const currentValues = { ...variableValues.value };
+            const nextValues = {};
+            newVars.forEach((v) => {
+              nextValues[v] = currentValues[v] || "";
+            });
+            variableValues.value = nextValues;
+          });
+
+          // Computed: Final Prompt Compilation
+          const compiledPrompt = computed(() => {
+            let p = "";
+
+            const addSection = (tag, content) => {
+              if (content && content.trim()) {
+                p += `<${tag}>\n${content.trim()}\n</${tag}>\n\n`;
+              }
+            };
+
+            addSection("user_bio", form.value.bio);
+            addSection("ai_persona", form.value.context);
+            addSection("purpose", form.value.purpose);
+            addSection("audience", form.value.audience);
+            addSection("style", form.value.style);
+
+            if (form.value.examples.length > 0) {
+              let exText = "";
+              form.value.examples.forEach((ex, i) => {
+                if (ex.input || ex.output) {
+                  exText += `Example ${i + 1}:\nInput: ${ex.input}\nOutput: ${
+                    ex.output
+                  }\n\n`;
+                }
+              });
+              addSection("examples", exText);
+            }
+
+            let finalTask = form.value.task;
+            detectedVariables.value.forEach((v) => {
+              const val = variableValues.value[v] || `[${v}]`;
+              finalTask = finalTask.replace(
+                new RegExp(`\\{\\{${v}\\}\\}`, "g"),
+                val
+              );
+            });
+
+            addSection("task", finalTask);
+
+            return p.trim();
+          });
+
+          // Syntax Highlighting
+          const highlightedPreview = computed(() => {
+            const escapeHtml = (text) => {
+              return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+            };
+
+            let html = escapeHtml(compiledPrompt.value);
+            html = html.replace(
+              /&lt;(\/?[a-z_]+)&gt;/g,
+              '<span class="text-cyan-400">&lt;$1&gt;</span>'
+            );
+            return html;
+          });
+
+          const isEmpty = computed(() => compiledPrompt.value.length === 0);
+
+          // --- METHODS ---
+
+          const addExample = () =>
+            form.value.examples.push({ input: "", output: "" });
+          const removeExample = (idx) => form.value.examples.splice(idx, 1);
+
+          const resetForm = () => {
+            if (confirm("Clear current prompt?")) {
+              form.value = {
+                bio: "",
+                context: "",
+                purpose: "",
+                audience: "",
+                style: "",
+                task: "",
+                examples: [],
+              };
+              variableValues.value = {};
+            }
+          };
+
+          const addToHistory = (field, value) => {
+            console.log(`Added to history [${field}]: ${value}`);
+          };
+
+          const copyToClipboard = async () => {
+            try {
+              const textArea = document.createElement("textarea");
+              textArea.value = compiledPrompt.value;
+              document.body.appendChild(textArea);
+              textArea.select();
+              document.execCommand("copy");
+              document.body.removeChild(textArea);
+
+              copied.value = true;
+              setTimeout(() => (copied.value = false), 2000);
+            } catch (err) {
+              console.error("Failed to copy", err);
+            }
+          };
+
+          // --- LOCAL STORAGE PERSISTENCE ---
+
+          const saveToLocal = () => {
+            try {
+              const data = {
+                form: form.value,
+                domain: domain.value,
+                updatedAt: new Date().toISOString(),
+              };
+              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+            } catch (e) {
+              console.error("Local Save failed:", e);
+            }
+          };
+
+          const loadPresets = () => {
+            try {
+              const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+              if (raw) {
+                const data = JSON.parse(raw);
+                if (data.form) form.value = data.form;
+                if (data.domain) domain.value = data.domain;
+              }
+            } catch (e) {
+              console.error("Load failed", e);
+            }
+          };
+
+          // Watch for changes and save automatically
+          watch(
+            form,
+            () => {
+              saveToLocal();
+            },
+            { deep: true }
+          );
+
+          watch(domain, () => {
+            saveToLocal();
+          });
+
+          onMounted(() => {
+            loadPresets();
+            // Initialize Lucide icons
+            nextTick(() => {
+              if (window.lucide) {
+                window.lucide.createIcons();
+              }
+            });
+          });
+
+          return {
+            domain,
+            form,
+            variableValues,
+            suggestions,
+            compiledPrompt,
+            highlightedPreview,
+            isEmpty,
+            detectedVariables,
+            addExample,
+            removeExample,
+            resetForm,
+            copyToClipboard,
+            copied,
+            addToHistory,
+            loadPresets,
+            showMobilePreview,
+          };
+        },
+      }).mount("#app");
+    </script>
+    <footer
+      class="fixed bottom-0 w-full p-2 text-[10px] text-slate-600 bg-slate-950 text-center z-50"
+    >
+      DISCLAIMER: This tool is provided "as-is" without warranty. Data is stored
+      locally on your device.
+      <a href="/legal.html" class="underline hover:text-slate-400"
+        >Terms of Use</a
+      >
+    </footer>
+  </body>
+</html>
