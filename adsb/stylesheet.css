@@ -1,0 +1,28 @@
+body {
+  background-color: #bebebe;
+}
+
+.c {
+  text-align: center;
+}
+h1 {
+  margin: 0;
+}
+
+.card {
+  background-color: #add8e5;
+  margin: auto;
+  margin-top: 10px;
+  width: 450px;
+  padding: 20px;
+  color: #1b3e59;
+  border-radius: 15px;
+  box-shadow: 8px 8px 16px 2px #1b3e59;
+}
+
+a:hover {
+  box-shadow: inset 300px 0 0 0 blue;
+  color: white;
+}
+
+/* https://www.cssmatic.com/box-shadow */
